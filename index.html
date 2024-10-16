@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아박이의 과수원</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">점수: 0</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0;
+        let basket = { x: canvas.width / 2, y: canvas.height - 80, width: 120, height: 60, speed: 10 };
+        let items = [];
+        let lastItemTime = 0;
+
+        function drawBackground() {
+            // Sky
+            let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, "#87CEEB");
+            gradient.addColorStop(1, "#E0F6FF");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground
+            ctx.fillStyle = "#7CFC00";
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height);
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(canvas.width, canvas.height * 0.7);
+            ctx.lineTo(0, canvas.height * 0.8);
+            ctx.fill();
+        }
+
+        function drawTree() {
+            // Tree trunk
+            ctx.fillStyle = "#8B4513";
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2 - 30, canvas.height * 0.7);
+            ctx.lineTo(canvas.width / 2 + 30, canvas.height * 0.7);
+            ctx.lineTo(canvas.width / 2 + 20, canvas.height * 0.3);
+            ctx.lineTo(canvas.width / 2 - 20, canvas.height * 0.3);
+            ctx.fill();
+
+            // Tree crown
+            ctx.fillStyle = "#228B22";
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height * 0.3, 120, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 - 70, canvas.height * 0.4, 70, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 + 70, canvas.height * 0.4, 70, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawBasket() {
+            ctx.fillStyle = "#D2691E";
+            ctx.beginPath();
+            ctx.moveTo(basket.x, basket.y + basket.height);
+            ctx.bezierCurveTo(
+                basket.x, basket.y,
+                basket.x + basket.width, basket.y,
+                basket.x + basket.width, basket.y + basket.height
+            );
+            ctx.fill();
+
+            // Knit pattern
+            ctx.strokeStyle = "#8B4513";
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(basket.x, basket.y + i * basket.height / 5);
+                for (let j = 0; j < 6; j++) {
+                    ctx.quadraticCurveTo(
+                        basket.x + (j * 2 + 1) * basket.width / 12, 
+                        basket.y + i * basket.height / 5 + (i % 2 === 0 ? 10 : -10), 
+                        basket.x + (j * 2 + 2) * basket.width / 12, 
+                        basket.y + i * basket.height / 5
+                    );
+                }
+                ctx.stroke();
+            }
+        }
+
+        function createItem() {
+            const isApple = Math.random() > 0.2;
+            return {
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: Math.random() * canvas.height * 0.3,
+                radius: 15,
+                speed: isApple ? Math.random() * 3 + 2 : Math.random() * 2 + 1,
+                isApple: isApple,
+                rotation: Math.random() * Math.PI * 2
+            };
+        }
+
+        function drawApple(x, y, radius, rotation) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+
+            // Apple body
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Apple highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(-radius/3, -radius/3, radius/2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Apple stem
+            ctx.strokeStyle = 'brown';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -radius);
+            ctx.quadraticCurveTo(radius/4, -radius-5, radius/2, -radius);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawCaterpillar(x, y, radius) {
+            ctx.fillStyle = 'limegreen';
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(x - i * radius * 0.8, y + Math.sin(i) * radius * 0.3, radius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Eyes
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(x + radius * 0.3, y - radius * 0.2, radius * 0.1, 0, Math.PI * 2);
+            ctx.arc(x + radius * 0.3, y + radius * 0.2, radius * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawItem(item) {
+            if (item.isApple) {
+                drawApple(item.x, item.y, item.radius, item.rotation);
+            } else {
+                drawCaterpillar(item.x, item.y, item.radius);
+            }
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawBackground();
+            drawTree();
+            drawBasket();
+
+            const currentTime = Date.now();
+            if (currentTime - lastItemTime > 1000 && items.length < 5) {
+                items.push(createItem());
+                lastItemTime = currentTime;
+            }
+
+            items.forEach((item, index) => {
+                item.y += item.speed;
+                item.rotation += 0.05;
+                drawItem(item);
+
+                if (item.y + item.radius > basket.y &&
+                    item.x > basket.x &&
+                    item.x < basket.x + basket.width) {
+                    if (item.isApple) {
+                        score += 10;
+                    } else {
+                        score -= 10;
+                    }
+                    items.splice(index, 1);
+                    scoreElement.textContent = `점수: ${score}`;
+                }
+
+                if (item.y > canvas.height) {
+                    items.splice(index, 1);
+                }
+            });
+
+            requestAnimationFrame(updateGame);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' && basket.x > 0) {
+                basket.x -= basket.speed;
+            } else if (e.key === 'ArrowRight' && basket.x + basket.width < canvas.width) {
+                basket.x += basket.speed;
+            }
+        });
+
+        updateGame();
+    </script>
+</body>
+</html>
