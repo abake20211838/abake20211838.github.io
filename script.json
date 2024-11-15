@@ -1,0 +1,12 @@
+async function generateQuiz() {
+    const inputText = document.getElementById("inputText").value;
+    const response = await fetch('https://your-ec2-instance-url/generate-quiz', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ input_text: inputText })
+    });
+    const data = await response.json();
+    document.getElementById("quizResult").innerText = data.quiz;
+}
